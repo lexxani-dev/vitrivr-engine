@@ -4,7 +4,9 @@ import io.javalin.http.Context
 import io.javalin.http.bodyAsClass
 import io.javalin.openapi.HttpMethod
 import io.javalin.openapi.OpenApi
+import io.javalin.openapi.OpenApiContent
 import io.javalin.openapi.OpenApiParam
+import io.javalin.openapi.OpenApiRequestBody
 import io.javalin.openapi.OpenApiResponse
 import kotlinx.serialization.Serializable
 import org.vitrivr.engine.core.model.metamodel.Schema
@@ -14,7 +16,7 @@ import org.vitrivr.engine.server.api.rest.model.ErrorStatus
 import org.vitrivr.engine.server.api.rest.model.ErrorStatusException
 
 @Serializable
-data class ClusteringRequest(val k: Int = 6)
+data class ClusteringRequest(val k: Int? = null)
 
 @Serializable
 data class ClusterAssignmentResponse(
@@ -40,6 +42,7 @@ data class ClusteringResponse(
     pathParams = [
         OpenApiParam("schema", type = String::class, description = "The schema to cluster.", required = true)
     ],
+    requestBody = OpenApiRequestBody([OpenApiContent(ClusteringRequest::class)], required = false),
     responses = [
         OpenApiResponse("200", [io.javalin.openapi.OpenApiContent(ClusteringResponse::class)]),
         OpenApiResponse("400", [io.javalin.openapi.OpenApiContent(ErrorStatus::class)]),
@@ -48,7 +51,7 @@ data class ClusteringResponse(
 )
 fun executeClustering(ctx: Context, schema: Schema) {
     val request = try {
-        ctx.bodyAsClass<ClusteringRequest>()
+        if (ctx.body().isBlank()) ClusteringRequest() else ctx.bodyAsClass<ClusteringRequest>()
     } catch (e: Exception) {
         throw ErrorStatusException(400, "Invalid clustering request: ${e.message}")
     }
@@ -60,15 +63,16 @@ fun executeClustering(ctx: Context, schema: Schema) {
         throw ErrorStatusException(400, "Schema '${schema.name}' contains no CLIP descriptors to cluster.")
     }
 
+    val requestedK = request.k ?: 6
     val assignments = try {
-        CLIPKMeansClusterer.cluster(descriptors, request.k)
+        CLIPKMeansClusterer.cluster(descriptors, requestedK)
     } catch (e: IllegalArgumentException) {
         throw ErrorStatusException(400, e.message ?: "Invalid clustering request.")
     }
 
     ctx.json(
         ClusteringResponse(
-            requestedK = request.k,
+            requestedK = requestedK,
             clusterCount = assignments.map { it.clusterId }.distinct().size,
             imageCount = assignments.size,
             assignments = assignments.map {

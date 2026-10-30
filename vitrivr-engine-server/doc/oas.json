@@ -38,6 +38,68 @@
         "security" : [ ]
       }
     },
+    "/api/{schema}/clusters" : {
+      "post" : {
+        "tags" : [ "Retrieval" ],
+        "summary" : "Clusters all CLIP image descriptors in a schema.",
+        "operationId" : "postClusterImages",
+        "parameters" : [ {
+          "name" : "schema",
+          "in" : "path",
+          "description" : "The schema to cluster.",
+          "required" : true,
+          "deprecated" : false,
+          "allowEmptyValue" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ClusteringRequest"
+              }
+            }
+          },
+          "required" : false
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ClusteringResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorStatus"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorStatus"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : false,
+        "security" : [ ]
+      }
+    },
     "/api/{schema}/fetch/{exporter}/{retrievableId}" : {
       "get" : {
         "tags" : [ "Content" ],
@@ -2276,6 +2338,60 @@
           }
         },
         "required" : [ "id", "score", "type", "parts", "properties" ]
+      },
+      "ClusterAssignmentResponse" : {
+        "type" : "object",
+        "additionalProperties" : false,
+        "properties" : {
+          "retrievableId" : {
+            "type" : "string"
+          },
+          "clusterId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "cosineDistance" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        },
+        "required" : [ "retrievableId", "clusterId", "cosineDistance" ]
+      },
+      "ClusteringRequest" : {
+        "type" : "object",
+        "additionalProperties" : false,
+        "properties" : {
+          "k" : {
+            "type" : "integer",
+            "format" : "int32",
+            "nullable" : true
+          }
+        }
+      },
+      "ClusteringResponse" : {
+        "type" : "object",
+        "additionalProperties" : false,
+        "properties" : {
+          "requestedK" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "clusterCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "imageCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "assignments" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ClusterAssignmentResponse"
+            }
+          }
+        },
+        "required" : [ "requestedK", "clusterCount", "imageCount", "assignments" ]
       },
       "SchemaList": {
         "type": "object",
