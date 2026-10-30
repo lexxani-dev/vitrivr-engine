@@ -98,7 +98,12 @@ fun main(args: Array<String>) {
     logger.info { "vitrivr engine API is listening on port ${config.api.port}." }
 
     /* Start the CLI in a new thread;  this will block the thread it runs on. */
-    cli.start()
+    if (args.contains("--headless")) {
+        logger.info { "Running in API-only mode; interactive CLI is disabled." }
+        Thread.currentThread().join()
+    } else {
+        cli.start()
+    }
 
     /* Upon reaching this point, the program was aborted. */
     /* Stop the Javalin server. */

@@ -40,6 +40,7 @@ fun configureApiRoutes(config: ApiConfig, manager: SchemaManager, executor: Exec
 
                 if (config.retrieval) {
                     post("query") { ctx -> executeQuery(ctx, schema, executor) }
+                    post("clusters") { ctx -> executeClustering(ctx, schema) }
                 }
 
                 if (config.export) {
