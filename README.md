@@ -130,6 +130,37 @@ initialize the `sandbox` schema and run the image ingestion pipeline as describe
 uses `DenseEmbedding` with a 512-dimensional vector field, and the existing retrieval pipeline can continue querying
 the `clip` field with text or an image.
 
+The FES image pipeline also supports zero-shot image classification. It uses the `ImageClassification` field and the
+`open-clip-vit-b32` model to compare each image with the candidate classes listed in
+`example-configs/fes/ingestion-image.json`. The pipeline stores the highest-scoring label and its confidence for each
+image. Change the comma-separated `classes` value to match the categories for your collection.
+
+To see the label in query results, add a `FieldLookup` operation after CLIP retrieval in Swagger:
+
+```json
+{
+  "inputs": {
+    "txt": { "type": "TEXT", "data": "a fox in a forest" }
+  },
+  "operations": {
+    "clip": {
+      "field": "clip",
+      "inputs": { "txt": "txt" },
+      "parameters": { "limit": "5" }
+    },
+    "classification": {
+      "factory": "FieldLookup",
+      "inputs": { "in": "clip" },
+      "parameters": { "field": "classification" }
+    }
+  },
+  "output": "classification"
+}
+```
+
+The response includes `classification.label` and `classification.confidence` for each retrieved image. The confidence is
+the model score, not a percentage.
+
 #### Setup Configuration
 
 Create a `config-schema.json` file to define your schema, fields, and backend. Make sure to adjust the database

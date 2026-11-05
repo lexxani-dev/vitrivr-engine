@@ -35,6 +35,15 @@
     },
     "source": {
       "field": "file"
+    },
+    "classification": {
+      "field": "classification",
+      "parameters": {
+        "classes": "fox,night sky,space,landscape,animal,city,cat",
+        "top_k": "1",
+        "threshold": "0.0",
+        "batchSize": "5"
+      }
     }
   },
   "operations": {
@@ -82,10 +91,16 @@
       "inputs": [
         "averagecolor"
       ]
+    },
+    "labels": {
+      "operator": "classification",
+      "inputs": [
+        "source"
+      ]
     }
   },
   "output": [
-    "source"
+    "labels"
   ],
   "mergeType": "MERGE"
 }
