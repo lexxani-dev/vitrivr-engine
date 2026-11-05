@@ -121,7 +121,7 @@ class DenseEmbedding : ExternalFesAnalyser<ContentElement<*>, FloatVectorDescrip
     ): Retriever<ContentElement<*>, FloatVectorDescriptor> {
         /* Prepare query parameters. */
         val host = field.parameters[HOST_PARAMETER_NAME] ?: HOST_PARAMETER_DEFAULT
-        val timeoutSeconds = field.parameters[TIMEOUT_MS_PARAMETER_NAME]?.toLongOrNull() ?: TIMEOUT_MS_PARAMETER_DEFAULT
+        val timeoutMs = field.parameters[TIMEOUT_MS_PARAMETER_NAME]?.toLongOrNull() ?: TIMEOUT_MS_PARAMETER_DEFAULT
         val pollingIntervalMs =
             field.parameters[POLLINGINTERVAL_MS_PARAMETER_NAME]?.toLongOrNull() ?: POLLINGINTERVAL_MS_PARAMETER_DEFAULT
         val retries = field.parameters[RETRIES_PARAMETER_NAME]?.toIntOrNull() ?: RETRIES_PARAMETER_DEFAULT
@@ -133,8 +133,8 @@ class DenseEmbedding : ExternalFesAnalyser<ContentElement<*>, FloatVectorDescrip
 
         /* Generate vector for content element. */
         val vector = when (val c = content.values.first { it is ImageContent || it is TextContent }) {
-            is ImageContent -> ImageEmbeddingApi(host, model, timeoutSeconds, pollingIntervalMs, retries).analyse(c)
-            is TextContent -> TextEmbeddingApi(host, model, timeoutSeconds, pollingIntervalMs, retries).analyse(c)
+            is ImageContent -> ImageEmbeddingApi(host, model, timeoutMs, pollingIntervalMs, retries).analyse(c)
+            is TextContent -> TextEmbeddingApi(host, model, timeoutMs, pollingIntervalMs, retries).analyse(c)
             else -> throw IllegalArgumentException("Unsupported content type ${c.javaClass.simpleName}.")
         }
         if (vector == null) {

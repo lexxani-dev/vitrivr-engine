@@ -1,0 +1,49 @@
+services:
+  db:
+    image: ankane/pgvector
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  fes:
+    build:
+      context: .
+      dockerfile: Dockerfile.fes
+    image: vitrivr/fes-open-clip-b32:local
+    ports:
+      - "8889:8888"
+    volumes:
+      - ./sandbox/model-cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8888/api/tasks')"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  vitrivr-engine-fes:
+    build: .
+    image: vitrivr-engine:fes-local
+    depends_on:
+      db:
+        condition: service_healthy
+      fes:
+        condition: service_healthy
+    ports:
+      - "7071:7070"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./example-configs/fes/config-schema.json:/app/configs/config-schema.json
+      - ./example-configs/fes/ingestion-image.json:/app/configs/image-ingest.json
+      - ./example-configs/docker/video-ingest.json:/app/configs/video-ingest.json
+      - ./sandbox/thumbnails:/app/sandbox/thumbnails
+      - ./sandbox/media:/app/sandbox/media

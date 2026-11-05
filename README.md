@@ -116,6 +116,20 @@ All configuration files are mounted from the `vitrivr-engine-server/config` dire
 restart the containers to apply changes. Also, all data is mounted to the `vitrivr-engine-server/data` directory, so you
 can easily access the data files.
 
+##### Docker Setup with FES-backed CLIP
+
+To try the current FES integration without replacing the existing descriptor-server setup, use the separate Compose file:
+
+```bash
+docker compose -p vitrivr-fes -f docker-compose.fes.yml up --build -d
+```
+
+This builds the engine from this checkout and starts the FES OpenCLIP ViT B32 service. The engine is available at
+`http://localhost:7071/swagger-ui`; FES is exposed at `http://localhost:8889`. Put images in `sandbox/media`, then
+initialize the `sandbox` schema and run the image ingestion pipeline as described below. The FES schema configuration
+uses `DenseEmbedding` with a 512-dimensional vector field, and the existing retrieval pipeline can continue querying
+the `clip` field with text or an image.
+
 #### Setup Configuration
 
 Create a `config-schema.json` file to define your schema, fields, and backend. Make sure to adjust the database
