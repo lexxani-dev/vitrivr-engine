@@ -130,6 +130,27 @@ initialize the `sandbox` schema and run the image ingestion pipeline as describe
 uses `DenseEmbedding` with a 512-dimensional vector field, and the existing retrieval pipeline can continue querying
 the `clip` field with text or an image.
 
+#### Text and Image Retrieval
+
+The FES `DenseEmbedding` field supports both `TEXT` and `IMAGE` query inputs. The text request body is available in
+[`example-configs/fes/retrieval-text.json`](example-configs/fes/retrieval-text.json) and can be pasted into Swagger's
+`POST /api/{schema}/query` request body. Set the `schema` path value to `sandbox`.
+
+For an image query, run the PowerShell helper from the repository root:
+
+```powershell
+./example-configs/fes/query-image.ps1 -ImagePath ./sandbox/media/demo-fox.png -Schema sandbox
+```
+
+The helper encodes the image as a Base64 data URL and submits it to the same `clip` field. Use `-Limit 20` to change
+the number of returned results. Query responses contain retrievable IDs and scores; to preview a result, request
+`GET /api/sandbox/fetch/thumbnail/{retrievableId}` using its returned ID.
+
+For either query type, the pipeline is the same after embedding: FES creates a 512-dimensional CLIP vector, the
+`clip` field compares it with indexed image vectors using cosine distance, and pgvector returns the nearest images
+first. The engine attaches a similarity `score` to each result. It is a ranking score, not a percentage or a
+probability. The result ID can be used with the configured thumbnail exporter to fetch the image bytes.
+
 The FES image pipeline also supports zero-shot image classification. It uses the `ImageClassification` field and the
 `open-clip-vit-b32` model to compare each image with the candidate classes listed in
 `example-configs/fes/ingestion-image.json`. The pipeline stores the highest-scoring label and its confidence for each

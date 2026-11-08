@@ -26,7 +26,8 @@
           "parameters": {
             "host": "http://fes:8888",
             "model": "open-clip-vit-b32",
-            "length": "512"
+            "length": "512",
+            "distance": "COSINE"
           }
         },
         "classification": {

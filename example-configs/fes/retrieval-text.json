@@ -1,0 +1,20 @@
+{
+  "inputs": {
+    "txt": {
+      "type": "TEXT",
+      "data": "a fox in a forest"
+    }
+  },
+  "operations": {
+    "clip": {
+      "field": "clip",
+      "inputs": {
+        "txt": "txt"
+      },
+      "parameters": {
+        "limit": "10"
+      }
+    }
+  },
+  "output": "clip"
+}

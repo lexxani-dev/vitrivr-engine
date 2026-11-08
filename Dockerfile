@@ -19,7 +19,7 @@ RUN zipfile=$(ls /tmp/vitrivr-engine-server-*.zip | head -n 1) && \
     rm "$zipfile"
 
 COPY entrypoint.sh /app/vitrivr/entrypoint.sh
-RUN chmod +x /app/vitrivr/entrypoint.sh
+RUN sed -i 's/\r$//' /app/vitrivr/entrypoint.sh && chmod +x /app/vitrivr/entrypoint.sh
 
 WORKDIR /app/vitrivr
 EXPOSE 7070
