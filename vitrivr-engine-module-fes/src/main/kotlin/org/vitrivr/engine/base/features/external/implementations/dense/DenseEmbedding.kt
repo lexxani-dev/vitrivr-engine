@@ -121,7 +121,7 @@ class DenseEmbedding : ExternalFesAnalyser<ContentElement<*>, FloatVectorDescrip
     ): Retriever<ContentElement<*>, FloatVectorDescriptor> {
         /* Prepare query parameters. */
         val host = field.parameters[HOST_PARAMETER_NAME] ?: HOST_PARAMETER_DEFAULT
-        val timeoutSeconds = field.parameters[TIMEOUT_MS_PARAMETER_NAME]?.toLongOrNull() ?: TIMEOUT_MS_PARAMETER_DEFAULT
+        val timeoutMs = field.parameters[TIMEOUT_MS_PARAMETER_NAME]?.toLongOrNull() ?: TIMEOUT_MS_PARAMETER_DEFAULT
         val pollingIntervalMs =
             field.parameters[POLLINGINTERVAL_MS_PARAMETER_NAME]?.toLongOrNull() ?: POLLINGINTERVAL_MS_PARAMETER_DEFAULT
         val retries = field.parameters[RETRIES_PARAMETER_NAME]?.toIntOrNull() ?: RETRIES_PARAMETER_DEFAULT
@@ -131,14 +131,24 @@ class DenseEmbedding : ExternalFesAnalyser<ContentElement<*>, FloatVectorDescrip
             Distance.valueOf(field.parameters[DISTANCE_PARAMETER_NAME]?.uppercase() ?: DISTANCE_PARAMETER_DEFAULT)
         val fetchVector = context.getProperty(field.fieldName, "returnDescriptor")?.toBooleanStrictOrNull() ?: false
 
-        /* Generate vector for content element. */
-        val vector = when (val c = content.values.first { it is ImageContent || it is TextContent }) {
-            is ImageContent -> ImageEmbeddingApi(host, model, timeoutSeconds, pollingIntervalMs, retries).analyse(c)
-            is TextContent -> TextEmbeddingApi(host, model, timeoutSeconds, pollingIntervalMs, retries).analyse(c)
+        /* A CLIP retrieval request must have exactly one text or image query input. */
+        val queryInputs = content.values.filter { it is ImageContent || it is TextContent }
+        require(queryInputs.size == 1) {
+            "CLIP retrieval expects exactly one TEXT or IMAGE input, but received ${queryInputs.size}."
+        }
+
+        /* Generate the query vector with the matching FES endpoint. */
+        val vector = when (val c = queryInputs.single()) {
+            is ImageContent -> ImageEmbeddingApi(host, model, timeoutMs, pollingIntervalMs, retries).analyse(c)
+            is TextContent -> TextEmbeddingApi(host, model, timeoutMs, pollingIntervalMs, retries).analyse(c)
             else -> throw IllegalArgumentException("Unsupported content type ${c.javaClass.simpleName}.")
         }
         if (vector == null) {
             throw IllegalStateException("Failed to embed provided content.")
+        }
+        val expectedLength = field.parameters[LENGTH_PARAMETER_NAME]?.toIntOrNull() ?: LENGTH_PARAMETER_DEFAULT
+        require(vector.value.size == expectedLength) {
+            "FES returned a ${vector.value.size}-dimensional embedding for field '${field.fieldName}', which expects $expectedLength dimensions."
         }
 
         /* Return retriever. */

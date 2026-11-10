@@ -8,6 +8,7 @@ import org.vitrivr.engine.base.features.external.common.ExternalFesAnalyser.Comp
 import org.vitrivr.engine.base.features.external.common.ExternalFesAnalyser.Companion.RETRIES_PARAMETER_DEFAULT
 import org.vitrivr.engine.base.features.external.common.ExternalFesAnalyser.Companion.RETRIES_PARAMETER_NAME
 import org.vitrivr.engine.base.features.external.common.ExternalFesAnalyser.Companion.TIMEOUT_MS_PARAMETER_DEFAULT
+import org.vitrivr.engine.base.features.external.common.ExternalFesAnalyser.Companion.TIMEOUT_MS_PARAMETER_NAME
 import org.vitrivr.engine.core.context.Context
 import org.vitrivr.engine.core.features.AbstractBatchedExtractor
 import org.vitrivr.engine.core.model.content.element.ContentElement
@@ -47,15 +48,19 @@ abstract class FesExtractor<C : ContentElement<*>, D : Descriptor<*>> : Abstract
 
     /** */
     protected val timeoutMs: Long
-        get() = this.context[this.name, POLLINGINTERVAL_MS_PARAMETER_NAME]?.toLongOrNull()
+        get() = this.context[this.name, TIMEOUT_MS_PARAMETER_NAME]?.toLongOrNull()
+            ?: this.field?.parameters?.get(TIMEOUT_MS_PARAMETER_NAME)?.toLongOrNull()
             ?: TIMEOUT_MS_PARAMETER_DEFAULT
 
     /** */
     protected val pollingIntervalMs: Long
         get() = this.context[this.name, POLLINGINTERVAL_MS_PARAMETER_NAME]?.toLongOrNull()
+            ?: this.field?.parameters?.get(POLLINGINTERVAL_MS_PARAMETER_NAME)?.toLongOrNull()
             ?: POLLINGINTERVAL_MS_PARAMETER_DEFAULT
 
     /** */
     protected val retries: Int
-        get() =  this.context[this.name, RETRIES_PARAMETER_NAME]?.toIntOrNull() ?: RETRIES_PARAMETER_DEFAULT
+        get() = this.context[this.name, RETRIES_PARAMETER_NAME]?.toIntOrNull()
+            ?: this.field?.parameters?.get(RETRIES_PARAMETER_NAME)?.toIntOrNull()
+            ?: RETRIES_PARAMETER_DEFAULT
 }

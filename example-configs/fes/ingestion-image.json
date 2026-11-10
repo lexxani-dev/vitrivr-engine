@@ -1,0 +1,106 @@
+{
+  "schema": "sandbox",
+  "context": {
+    "contentFactory": "InMemoryContentFactory",
+    "resolvers": [
+      "disk"
+    ]
+  },
+  "operators": {
+    "enumerator": {
+      "factory": "FileSystemEnumerator",
+      "parameters": {
+        "path": "/app/sandbox/media/",
+        "depth": "1",
+        "mediaTypes": "IMAGE"
+      }
+    },
+    "decoder": {
+      "factory": "ImageDecoder"
+    },
+    "aggregator": {
+      "factory": "MiddleContentAggregator"
+    },
+    "persister": {
+      "factory": "PersistRetrievableTransformer"
+    },
+    "thumbnail": {
+      "exporter": "thumbnail"
+    },
+    "clip": {
+      "field": "clip"
+    },
+    "averagecolor": {
+      "field": "averagecolor"
+    },
+    "source": {
+      "field": "file"
+    },
+    "classification": {
+      "field": "classification",
+      "parameters": {
+        "classes": "fox,night sky,space,landscape,animal,city,cat",
+        "top_k": "1",
+        "threshold": "0.0",
+        "batchSize": "5"
+      }
+    }
+  },
+  "operations": {
+    "enumerator": {
+      "operator": "enumerator"
+    },
+    "decoder": {
+      "operator": "decoder",
+      "inputs": [
+        "enumerator"
+      ]
+    },
+    "middle": {
+      "operator": "aggregator",
+      "inputs": [
+        "decoder"
+      ]
+    },
+    "persist": {
+      "operator": "persister",
+      "inputs": [
+        "middle"
+      ]
+    },
+    "thumbnail": {
+      "operator": "thumbnail",
+      "inputs": [
+        "persist"
+      ]
+    },
+    "clip": {
+      "operator": "clip",
+      "inputs": [
+        "thumbnail"
+      ]
+    },
+    "averagecolor": {
+      "operator": "averagecolor",
+      "inputs": [
+        "clip"
+      ]
+    },
+    "source": {
+      "operator": "source",
+      "inputs": [
+        "averagecolor"
+      ]
+    },
+    "labels": {
+      "operator": "classification",
+      "inputs": [
+        "source"
+      ]
+    }
+  },
+  "output": [
+    "labels"
+  ],
+  "mergeType": "MERGE"
+}

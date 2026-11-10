@@ -116,6 +116,72 @@ All configuration files are mounted from the `vitrivr-engine-server/config` dire
 restart the containers to apply changes. Also, all data is mounted to the `vitrivr-engine-server/data` directory, so you
 can easily access the data files.
 
+##### Docker Setup with FES-backed CLIP
+
+To try the current FES integration without replacing the existing descriptor-server setup, use the separate Compose file:
+
+```bash
+docker compose -p vitrivr-fes -f docker-compose.fes.yml up --build -d
+```
+
+This builds the engine from this checkout and starts the FES OpenCLIP ViT B32 service. The engine is available at
+`http://localhost:7071/swagger-ui`; FES is exposed at `http://localhost:8889`. Put images in `sandbox/media`, then
+initialize the `sandbox` schema and run the image ingestion pipeline as described below. The FES schema configuration
+uses `DenseEmbedding` with a 512-dimensional vector field, and the existing retrieval pipeline can continue querying
+the `clip` field with text or an image.
+
+#### Text and Image Retrieval
+
+The FES `DenseEmbedding` field supports both `TEXT` and `IMAGE` query inputs. The text request body is available in
+[`example-configs/fes/retrieval-text.json`](example-configs/fes/retrieval-text.json) and can be pasted into Swagger's
+`POST /api/{schema}/query` request body. Set the `schema` path value to `sandbox`.
+
+For an image query, run the PowerShell helper from the repository root:
+
+```powershell
+./example-configs/fes/query-image.ps1 -ImagePath ./sandbox/media/demo-fox.png -Schema sandbox
+```
+
+The helper encodes the image as a Base64 data URL and submits it to the same `clip` field. Use `-Limit 20` to change
+the number of returned results. Query responses contain retrievable IDs and scores; to preview a result, request
+`GET /api/sandbox/fetch/thumbnail/{retrievableId}` using its returned ID.
+
+For either query type, the pipeline is the same after embedding: FES creates a 512-dimensional CLIP vector, the
+`clip` field compares it with indexed image vectors using cosine distance, and pgvector returns the nearest images
+first. The engine attaches a similarity `score` to each result. It is a ranking score, not a percentage or a
+probability. The result ID can be used with the configured thumbnail exporter to fetch the image bytes.
+
+The FES image pipeline also supports zero-shot image classification. It uses the `ImageClassification` field and the
+`open-clip-vit-b32` model to compare each image with the candidate classes listed in
+`example-configs/fes/ingestion-image.json`. The pipeline stores the highest-scoring label and its confidence for each
+image. Change the comma-separated `classes` value to match the categories for your collection.
+
+To see the label in query results, add a `FieldLookup` operation after CLIP retrieval in Swagger:
+
+```json
+{
+  "inputs": {
+    "txt": { "type": "TEXT", "data": "a fox in a forest" }
+  },
+  "operations": {
+    "clip": {
+      "field": "clip",
+      "inputs": { "txt": "txt" },
+      "parameters": { "limit": "5" }
+    },
+    "classification": {
+      "factory": "FieldLookup",
+      "inputs": { "in": "clip" },
+      "parameters": { "field": "classification" }
+    }
+  },
+  "output": "classification"
+}
+```
+
+The response includes `classification.label` and `classification.confidence` for each retrieved image. The confidence is
+the model score, not a percentage.
+
 #### Setup Configuration
 
 Create a `config-schema.json` file to define your schema, fields, and backend. Make sure to adjust the database

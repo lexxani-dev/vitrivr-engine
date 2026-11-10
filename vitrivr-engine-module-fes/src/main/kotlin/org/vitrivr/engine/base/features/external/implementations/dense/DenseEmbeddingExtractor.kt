@@ -50,40 +50,53 @@ class DenseEmbeddingExtractor : FesExtractor<ContentElement<*>, FloatVectorDescr
      * @param retrievables The [Retrievable]s to process.
      * @return List of resulting [Descriptor]s grouped by [Retrievable].
      */
-    override fun extract(retrievables: List<Retrievable>): List<List<FloatVectorDescriptor>> {
-        val content = retrievables.flatMap { it.content }
-        val textContent = content.mapIndexed { index, contentElement -> if (contentElement is TextContent) index to contentElement else null }.filterNotNull().toMap()
-        val imageContent = content.mapIndexed { index, contentElement -> if (contentElement is ImageContent) index to contentElement else null }.filterNotNull().toMap()
-
-        val textResults: List<FloatVectorDescriptor> = if (textContent.isNotEmpty()) {
-            this.textApi.analyseBatched(textContent.map { it.value })
-                .map { FloatVectorDescriptor(UUID.randomUUID(), null, it, this.field) }
-        } else {
-            emptyList()
+    override fun extract(batch: List<Retrievable>): List<List<FloatVectorDescriptor>> {
+        /* Keep each content element associated with the retrievable it came from. */
+        val textContent = batch.flatMapIndexed { retrievableIndex, retrievable ->
+            retrievable.content.filterIsInstance<TextContent>().map { retrievableIndex to it }
         }
-
-        val imageResults: List<FloatVectorDescriptor> = if (imageContent.isNotEmpty()) {
-            this.imageApi.analyseBatched(imageContent.map { it.value })
-                .map { FloatVectorDescriptor(UUID.randomUUID(), null, it, this.field) }
-        } else {
-            emptyList()
+        val imageContent = batch.flatMapIndexed { retrievableIndex, retrievable ->
+            retrievable.content.filterIsInstance<ImageContent>().map { retrievableIndex to it }
         }
+        val descriptorsByRetrievable = Array(batch.size) { mutableListOf<FloatVectorDescriptor>() }
 
-
-        val textResultMap = textContent.keys.zip(textResults).toMap()
-        val imageResultMap = imageContent.keys.zip(imageResults).toMap()
-
-        return retrievables.indices.map { index ->
-            val descriptors = mutableListOf<FloatVectorDescriptor>()
-            textResultMap[index]?.let {
-
-                descriptors.add(FloatVectorDescriptor(it.id, retrievables[index].id, it.vector, it.field))
+        if (textContent.isNotEmpty()) {
+            val textResults = this.textApi.analyseBatched(textContent.map { it.second })
+            check(textResults.size == textContent.size) {
+                "FES returned ${textResults.size} text embeddings for ${textContent.size} inputs."
             }
-            imageResultMap[index]?.let {
-                descriptors.add(FloatVectorDescriptor(it.id, retrievables[index].id, it.vector, it.field))
+            textContent.zip(textResults).forEach { (source, vector) ->
+                val retrievableIndex = source.first
+                descriptorsByRetrievable[retrievableIndex].add(
+                    FloatVectorDescriptor(
+                        UUID.randomUUID(),
+                        batch[retrievableIndex].id,
+                        vector,
+                        this.field
+                    )
+                )
             }
-            descriptors
         }
+
+        if (imageContent.isNotEmpty()) {
+            val imageResults = this.imageApi.analyseBatched(imageContent.map { it.second })
+            check(imageResults.size == imageContent.size) {
+                "FES returned ${imageResults.size} image embeddings for ${imageContent.size} inputs."
+            }
+            imageContent.zip(imageResults).forEach { (source, vector) ->
+                val retrievableIndex = source.first
+                descriptorsByRetrievable[retrievableIndex].add(
+                    FloatVectorDescriptor(
+                        UUID.randomUUID(),
+                        batch[retrievableIndex].id,
+                        vector,
+                        this.field
+                    )
+                )
+            }
+        }
+
+        return descriptorsByRetrievable.map { it.toList() }
     }
 
 

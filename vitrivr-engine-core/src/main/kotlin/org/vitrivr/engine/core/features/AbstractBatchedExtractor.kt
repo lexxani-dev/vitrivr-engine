@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import org.vitrivr.engine.core.context.Context
+import org.vitrivr.engine.core.database.descriptor.DescriptorWriter
 import org.vitrivr.engine.core.model.content.element.ContentElement
 import org.vitrivr.engine.core.model.descriptor.Descriptor
 import org.vitrivr.engine.core.model.metamodel.Analyser
@@ -56,6 +57,9 @@ abstract class AbstractBatchedExtractor<C : ContentElement<*>, D : Descriptor<*>
 
     /** The [KLogger] instance used by this [AbstractExtractor]. */
     protected val logger: KLogger = KotlinLogging.logger {}
+
+    /** The descriptor writer backing this extractor, if it is associated with a schema field. */
+    protected val writer: DescriptorWriter<D>? by lazy { this.field?.getWriter() }
 
 
     /** The buffer size of this [org.vitrivr.engine.core.features.AbstractBatchedExtractor]*/
@@ -116,6 +120,7 @@ abstract class AbstractBatchedExtractor<C : ContentElement<*>, D : Descriptor<*>
             logger.error(e) { "Error during batched extraction: ${e.message}" }
             emptyList()
         }
+        this.writer?.addAll(allDescriptors.flatten())
         return batch.mapIndexed { i, r ->
             val sourceAttribute = DescriptorAuthorAttribute()
             val descriptors = allDescriptors.getOrNull(i) ?: emptyList()

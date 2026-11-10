@@ -1,0 +1,10 @@
+.git/
+.github/
+.gradle/
+.idea/
+.kotlin/
+**/.gradle/
+**/build/
+demo-data/
+images/
+sandbox/
