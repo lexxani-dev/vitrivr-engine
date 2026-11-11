@@ -121,11 +121,12 @@ can easily access the data files.
 To try the current FES integration without replacing the existing descriptor-server setup, use the separate Compose file:
 
 ```bash
-docker compose -p vitrivr-fes -f docker-compose.fes.yml up --build -d
+docker compose -p vitrivr-byol -f docker-compose.fes.yml up --build -d
 ```
 
 This builds the engine from this checkout and starts the FES OpenCLIP ViT B32 service. The engine is available at
-`http://localhost:7071/swagger-ui`; FES is exposed at `http://localhost:8889`. Put images in `sandbox/media`, then
+`http://localhost:7074/swagger-ui`; CLIP FES is exposed at `http://localhost:8889`, and BYOL/Painter FES at
+`http://localhost:8890`. Put images in `sandbox/media`, then
 initialize the `sandbox` schema and run the image ingestion pipeline as described below. The FES schema configuration
 uses `DenseEmbedding` with a 512-dimensional vector field, and the existing retrieval pipeline can continue querying
 the `clip` field with text or an image.
@@ -149,16 +150,18 @@ the number of returned results. Query responses contain retrievable IDs and scor
 #### Simple Search UI
 
 A demo page at [`example-configs/fes/search-demo.html`](example-configs/fes/search-demo.html) supports text
-search, reference-image search with either CLIP or the existing AverageColor feature, cluster filtering, and browsing
-the indexed collection. AverageColor is a basic color-similarity baseline; it is not a copy of iART's original color
-plugins. With the FES Compose stack running and images already indexed in the `sandbox` schema, serve the page from a
+search, reference-image search with CLIP, iART BYOL, iART Painter style/genre, or the AverageColor feature, cluster
+filtering, and browsing the indexed collection. AverageColor is a basic color-similarity baseline; it is not a copy
+of iART's original color plugins. The BYOL and Painter checkpoints are supplied separately and are not stored in Git;
+see [`BYOL_IMAGE_SEARCH.md`](BYOL_IMAGE_SEARCH.md) and [`PAINTER_IMAGE_SEARCH.md`](PAINTER_IMAGE_SEARCH.md). With the
+FES Compose stack running and images already indexed in the `sandbox` schema, serve the page from a
 second PowerShell window at the repository root:
 
 ```powershell
 py -m http.server 7072 --directory example-configs/fes
 ```
 
-Open `http://localhost:7072/search-demo.html`. The page uses `http://127.0.0.1:7071/api/sandbox` by default. To point
+Open `http://localhost:7072/search-demo.html`. The page uses `http://127.0.0.1:7074/api/sandbox` by default. To point
 it at a different API and schema, add an `api` query parameter, for example:
 `http://localhost:7072/search-demo.html?api=http://127.0.0.1:7070/api/clusteringdemo`.
 
@@ -166,6 +169,9 @@ For either query type, the pipeline is the same after embedding: FES creates a 5
 `clip` field compares it with indexed image vectors using cosine distance, and pgvector returns the nearest images
 first. The engine attaches a similarity `score` to each result. It is a ranking score, not a percentage or a
 probability. The result ID can be used with the configured thumbnail exporter to fetch the image bytes.
+
+The image-only BYOL and Painter fields require fresh ingestion after their fields are added to the schema. Text search
+continues to use CLIP. Painter style and genre are separate 256-dimensional image descriptors.
 
 The FES image pipeline also supports zero-shot image classification. It uses the `ImageClassification` field and the
 `open-clip-vit-b32` model to compare each image with the candidate classes listed in

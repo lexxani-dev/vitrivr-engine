@@ -5,7 +5,7 @@ param(
     [string]$ImagePath,
 
     [string]$Schema = "sandbox",
-    [string]$ApiBase = "http://localhost:7071",
+    [string]$ApiBase = "http://localhost:7074",
 
     [ValidateRange(1, 1000)]
     [int]$Limit = 10

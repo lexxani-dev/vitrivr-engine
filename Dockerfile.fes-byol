@@ -5,7 +5,11 @@ RUN python -m pip uninstall -y opencv-python \
     && python -m pip install --no-cache-dir --no-deps opencv-python-headless==4.9.0.80
 
 COPY fes-byol/ /tmp/fes-byol/
+COPY fes-painter-style/ /tmp/fes-painter-style/
+COPY fes-painter-genre/ /tmp/fes-painter-genre/
 RUN python -m pip install --no-deps --no-build-isolation /tmp/fes-byol \
-    && rm -rf /tmp/fes-byol
+    /tmp/fes-painter-style /tmp/fes-painter-genre \
+    && rm -rf /tmp/fes-byol /tmp/fes-painter-style /tmp/fes-painter-genre
 
 ENV BYOL_MODEL_PATH=/models/byol_embedding/byol_wikipedia.pt
+ENV PAINTER_MODEL_PATH=/models/kaggle_embedding/kaggle_embedding.pt

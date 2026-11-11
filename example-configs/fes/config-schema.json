@@ -39,6 +39,24 @@
             "distance": "COSINE"
           }
         },
+        "painterstyle": {
+          "factory": "DenseEmbedding",
+          "parameters": {
+            "host": "http://fes-byol:8888",
+            "model": "painter-style",
+            "length": "256",
+            "distance": "COSINE"
+          }
+        },
+        "paintergenre": {
+          "factory": "DenseEmbedding",
+          "parameters": {
+            "host": "http://fes-byol:8888",
+            "model": "painter-genre",
+            "length": "256",
+            "distance": "COSINE"
+          }
+        },
         "classification": {
           "factory": "ImageClassification",
           "parameters": {

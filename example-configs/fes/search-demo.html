@@ -62,6 +62,8 @@
         <select id="image-feature" aria-label="Image search feature">
           <option value="clip">CLIP</option>
           <option value="byol">iART BYOL (image only)</option>
+          <option value="painterstyle">iART Painter style (image only)</option>
+          <option value="paintergenre">iART Painter genre (image only)</option>
           <option value="averagecolor">Average color (baseline)</option>
         </select>
       </label>
@@ -81,6 +83,8 @@
       <select id="cluster-field" aria-label="Vector field used for clustering">
         <option value="clip">CLIP</option>
         <option value="byol">iART BYOL</option>
+        <option value="painterstyle">iART Painter style</option>
+        <option value="paintergenre">iART Painter genre</option>
         <option value="averagecolor">Average color</option>
       </select>
     </label>
@@ -119,7 +123,7 @@
 <script src="./umap.bundle.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
-const defaultApi = 'http://127.0.0.1:7071/api/sandbox';
+const defaultApi = 'http://127.0.0.1:7074/api/sandbox';
 const api = (params.get('api') || defaultApi).replace(/\/+$/, '');
 document.querySelector('#api-label').textContent = `API: ${api}`;
 
@@ -224,6 +228,8 @@ function render(items) {
   const description = searchMode === 'image'
     ? lastImageFeature === 'averagecolor' ? 'images with similar average color'
       : lastImageFeature === 'byol' ? 'iART BYOL visually similar images'
+      : lastImageFeature === 'painterstyle' ? 'iART Painter style-similar images'
+      : lastImageFeature === 'paintergenre' ? 'iART Painter genre-similar images'
       : 'visually similar images'
     : searchMode === 'browse' ? 'images in the collection' : 'matching images';
   statusLine.textContent = `Showing ${visible.length} of ${filtered.length} ${description} · ${clusterCount} clusters (k=${loadedK}).`;

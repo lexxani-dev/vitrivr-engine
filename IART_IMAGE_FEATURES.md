@@ -10,7 +10,7 @@ TIBaVA work is outside this scope.
 - **CLIP retrieval:** the FES configuration uses OpenCLIP ViT-B/32 with 512-dimensional descriptors. The same field
   supports text-to-image and image-to-image retrieval.
 - **Image query UI:** the local 50-image page has an image-upload query path. A portable page is also available at
-  `example-configs/fes/search-demo.html`; it offers CLIP, iART BYOL, and AverageColor image search.
+  `example-configs/fes/search-demo.html`; it offers CLIP, iART BYOL, iART Painter style/genre, and AverageColor image search.
 - **Color baseline:** the FES schema and ingestion pipeline already include `AverageColor`, a three-value RGB summary.
   This is useful for a simple comparison, but it is not equivalent to iART's color plug-ins.
 - **Clustering:** the project has spherical k-means for dense vector fields, with CLIP as the default and AverageColor
@@ -31,7 +31,7 @@ shared space. See the [iART paper](https://arxiv.org/abs/2108.01542) and the [of
 | Color similarity | AverageColor is available as a basic baseline | Compare it with iART's actual color extractor before claiming equivalence |
 | ImageNet ResNet features | Not enabled in the current team pipeline | Confirm the iART model/checkpoint, preprocessing, and output dimension; store it in its own field |
 | BYOL art features | Implemented as a separate 256-dimensional image-only field using iART's Wikipedia-trained checkpoint | Supply the local checkpoint, run the BYOL FES service, and reindex the collection; see `BYOL_IMAGE_SEARCH.md` |
-| Painter style/genre features | Not enabled in the current team pipeline | Obtain the model and labels/checkpoint; add a separate feature/classification path and reindex |
+| Painter style/genre features | Implemented as separate 256-dimensional image-only fields using iART's KaggleResnet checkpoint | Supply the local checkpoint and reindex the collection; see `PAINTER_IMAGE_SEARCH.md` |
 | Iconclass/iMet/Painter classifiers | Not equivalent to the current OpenCLIP top-label setup; tagging belongs to the teammate | Coordinate with the teammate and compare the original label sets and model outputs |
 | Clustering and UMAP | Spherical k-means works on selected dense-vector fields; the portable demo projects up to 500 vectors with UMAP | Evaluate the map on a larger art collection and compare feature spaces |
 
@@ -67,7 +67,7 @@ behind the existing vitrivr field/query interfaces, while keeping CLIP intact.
 1. Complete M1 by running the tracked UI against the FES-backed schema with the team's image collection and confirming
    both CLIP query modes.
 2. Keep AverageColor as a comparison baseline; do not call it the original iART color model.
-3. For M I2/M I3, evaluate BYOL image matches on an art collection and confirm model-specific checkpoint terms. Then
-   compare the other iART extractors and classifier label sets before integrating them.
+3. For M I2/M I3, compare CLIP, BYOL, and Painter style/genre image matches on an art collection. Then compare the
+   remaining iART extractors and classifier label sets before integrating them.
 4. Evaluate the new UMAP map and field-selectable clustering in M I4 on a larger art collection.
 5. Leave custom models and retrieval experiments for M I5.

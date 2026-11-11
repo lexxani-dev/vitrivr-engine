@@ -1,0 +1,13 @@
+[build-system]
+requires = ["flit_core>=3.9,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "feature-extraction-server-models-iart-painter-style"
+version = "0.1.0"
+description = "iART Painter-by-Numbers style embeddings for the Feature Extraction Server."
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.flit.module]
+name = "feature_extraction_server.models.painter_style"

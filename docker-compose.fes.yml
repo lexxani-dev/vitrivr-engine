@@ -40,6 +40,7 @@ services:
       - "8890:8888"
     volumes:
       - ./sandbox/models/byol_embedding:/models/byol_embedding:ro
+      - ./sandbox/models/kaggle_embedding:/models/kaggle_embedding:ro
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8888/api/models')"]
       interval: 10s
@@ -58,7 +59,7 @@ services:
       fes-byol:
         condition: service_healthy
     ports:
-      - "${ENGINE_PORT:-7071}:7070"
+      - "${ENGINE_PORT:-7074}:7070"
     tty: true
     stdin_open: true
     volumes:

@@ -33,6 +33,12 @@
     "byol": {
       "field": "byol"
     },
+    "painterstyle": {
+      "field": "painterstyle"
+    },
+    "paintergenre": {
+      "field": "paintergenre"
+    },
     "averagecolor": {
       "field": "averagecolor"
     },
@@ -106,8 +112,20 @@
       "inputs": [
         "labels"
       ]
+    },
+    "painterstyle": {
+      "operator": "painterstyle",
+      "inputs": [
+        "byol"
+      ]
+    },
+    "paintergenre": {
+      "operator": "paintergenre",
+      "inputs": [
+        "painterstyle"
+      ]
     }
   },
-  "output": ["byol"],
+  "output": ["paintergenre"],
   "mergeType": "MERGE"
 }

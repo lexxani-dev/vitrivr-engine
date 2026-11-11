@@ -30,7 +30,7 @@ tar -xzf "$env:USERPROFILE\Downloads\models_cpu.tar.gz" -C .\sandbox models/byol
 From the repository root, start the FES-backed demo stack using `docker-compose.fes.yml`:
 
 ```powershell
-$env:ENGINE_PORT = "7074" # Use 7071 instead if it is free.
+$env:ENGINE_PORT = "7074"
 $env:FES_MODEL_CACHE = "C:/path/to/sandbox/model-cache" # Optional: reuse a downloaded OpenCLIP cache.
 docker compose -p vitrivr-byol -f docker-compose.fes.yml up --build -d
 ```
