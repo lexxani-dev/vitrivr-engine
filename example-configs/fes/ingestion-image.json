@@ -104,10 +104,10 @@
     "byol": {
       "operator": "byol",
       "inputs": [
-        "source"
+        "labels"
       ]
     }
   },
-  "output": ["labels", "byol"],
+  "output": ["byol"],
   "mergeType": "MERGE"
 }
