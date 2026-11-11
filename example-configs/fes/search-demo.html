@@ -26,6 +26,10 @@
     #status { min-height: 24px; color: #93c5fd; }
     #api-label, .note { font-size: .88rem; }
     #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+    #umap-panel { margin: 18px 0; padding: 18px; border: 1px solid #374151; border-radius: 12px; background: #172235; }
+    #umap-panel[hidden] { display: none; }
+    #umap-canvas { display: block; width: 100%; height: min(62vw, 620px); min-height: 340px; border: 1px solid #374151; border-radius: 8px; background: #111827; cursor: crosshair; }
+    #umap-status { min-height: 24px; color: #93c5fd; }
     article { overflow: hidden; border: 1px solid #374151; border-radius: 12px; background: #1f2937; }
     article img { width: 100%; height: 190px; object-fit: cover; background: #0b1220; }
     article div { padding: 10px 12px; }
@@ -65,6 +69,12 @@
         <option value="4">4</option><option value="6" selected>6</option><option value="8">8</option><option value="10">10</option>
       </select>
     </label>
+    <label>Cluster vectors
+      <select id="cluster-field" aria-label="Vector field used for clustering">
+        <option value="clip">CLIP</option>
+        <option value="averagecolor">Average color</option>
+      </select>
+    </label>
     <label>Results
       <select id="limit" aria-label="Number of results">
         <option value="10">10</option><option value="20" selected>20</option><option value="50">50</option>
@@ -74,11 +84,20 @@
       <select id="cluster" aria-label="Filter by cluster"><option value="all">All clusters</option></select>
     </label>
     <button id="browse" class="secondary" type="button">Browse collection</button>
+    <button id="show-umap" class="secondary" type="button">2D map (UMAP)</button>
   </section>
 
   <div id="status" aria-live="polite">Loading cluster information…</div>
+  <section id="umap-panel" aria-label="UMAP embedding map" hidden>
+    <h2>Image map</h2>
+    <p>Nearby points have similar vectors in the selected feature space. UMAP coordinates are for exploration, not a relevance score.</p>
+    <div id="umap-status" aria-live="polite"></div>
+    <canvas id="umap-canvas" width="1000" height="620" aria-label="Two-dimensional UMAP projection of indexed images"></canvas>
+    <p class="note">Point color shows its cluster. Hover to see an image ID; click a point to open that image below.</p>
+  </section>
   <section id="results" aria-label="Search results"></section>
 </main>
+<script src="./umap.bundle.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const defaultApi = 'http://127.0.0.1:7071/api/sandbox';
@@ -88,6 +107,7 @@ document.querySelector('#api-label').textContent = `API: ${api}`;
 const clusterById = new Map();
 const clusterSelect = document.querySelector('#cluster');
 const kSelect = document.querySelector('#k');
+const clusterFieldSelect = document.querySelector('#cluster-field');
 const limitSelect = document.querySelector('#limit');
 const statusLine = document.querySelector('#status');
 const results = document.querySelector('#results');
@@ -99,13 +119,20 @@ const imageFeature = document.querySelector('#image-feature');
 const imageButton = document.querySelector('#image-button');
 const textButton = document.querySelector('#text-button');
 const browseButton = document.querySelector('#browse');
+const showUmapButton = document.querySelector('#show-umap');
+const umapPanel = document.querySelector('#umap-panel');
+const umapStatus = document.querySelector('#umap-status');
+const umapCanvas = document.querySelector('#umap-canvas');
+const umapContext = umapCanvas.getContext('2d');
 
 let loadedK = null;
+let loadedField = null;
 let latestItems = [];
 let searchMode = 'ready';
 let previewUrl = null;
 let clusterCount = 0;
 let lastImageFeature = 'clip';
+let mapPoints = [];
 
 async function readApiResponse(response) {
   let data = {};
@@ -114,9 +141,9 @@ async function readApiResponse(response) {
   return data;
 }
 
-async function loadClusters(k) {
+async function loadClusters(k, field = clusterFieldSelect.value) {
   const response = await fetch(`${api}/clusters`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ k })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ k, field })
   });
   const data = await readApiResponse(response);
   clusterById.clear();
@@ -128,6 +155,7 @@ async function loadClusters(k) {
   for (const id of ids) clusterSelect.add(new Option(`Cluster ${Number(id) + 1}`, id));
   clusterCount = data.clusterCount || 0;
   loadedK = k;
+  loadedField = field;
   return data;
 }
 
@@ -177,10 +205,11 @@ async function submitQuery(body, mode) {
   const button = mode === 'image' ? imageButton : textButton;
   button.disabled = true;
   searchMode = mode;
+  umapPanel.hidden = true;
   statusLine.textContent = mode === 'image' ? 'Searching by image…' : 'Searching by text…';
   try {
     const k = Number(kSelect.value);
-    if (loadedK !== k) await loadClusters(k);
+    if (loadedK !== k || loadedField !== clusterFieldSelect.value) await loadClusters(k);
     const response = await fetch(`${api}/query`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
@@ -259,6 +288,7 @@ imageForm.addEventListener('submit', async event => {
 browseButton.addEventListener('click', async () => {
   browseButton.disabled = true;
   searchMode = 'browse';
+  umapPanel.hidden = true;
   statusLine.textContent = 'Loading the collection…';
   try {
     const data = await loadClusters(Number(kSelect.value));
@@ -271,12 +301,132 @@ browseButton.addEventListener('click', async () => {
   }
 });
 
+function seededRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6D2B79F5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function cosineDistance(a, b) {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  if (normA === 0 || normB === 0) return 1;
+  return 1 - Math.max(-1, Math.min(1, dot / Math.sqrt(normA * normB)));
+}
+
+function drawUmap(points) {
+  mapPoints = points;
+  umapContext.clearRect(0, 0, umapCanvas.width, umapCanvas.height);
+  if (!points.length) return;
+  const xs = points.map(point => point.x);
+  const ys = points.map(point => point.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const pad = 36;
+  const rangeX = maxX - minX || 1;
+  const rangeY = maxY - minY || 1;
+  umapContext.fillStyle = '#111827';
+  umapContext.fillRect(0, 0, umapCanvas.width, umapCanvas.height);
+  for (const point of points) {
+    const x = pad + ((point.x - minX) / rangeX) * (umapCanvas.width - 2 * pad);
+    const y = pad + ((point.y - minY) / rangeY) * (umapCanvas.height - 2 * pad);
+    point.pixelX = x;
+    point.pixelY = umapCanvas.height - y;
+    umapContext.beginPath();
+    umapContext.arc(point.pixelX, point.pixelY, 7, 0, Math.PI * 2);
+    umapContext.fillStyle = `hsl(${(Number(point.clusterId || 0) * 67 + 190) % 360} 78% 62%)`;
+    umapContext.fill();
+    umapContext.strokeStyle = '#111827';
+    umapContext.lineWidth = 2;
+    umapContext.stroke();
+  }
+}
+
+showUmapButton.addEventListener('click', async () => {
+  showUmapButton.disabled = true;
+  umapPanel.hidden = false;
+  mapPoints = [];
+  umapStatus.textContent = 'Loading image vectors…';
+  try {
+    const field = clusterFieldSelect.value;
+    const response = await fetch(`${api}/embeddings`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ field, limit: 500 })
+    });
+    const data = await readApiResponse(response);
+    const embeddings = data.embeddings || [];
+    if (embeddings.length < 3) throw new Error('UMAP needs at least three indexed images in this field.');
+    if (loadedK !== Number(kSelect.value) || loadedField !== field) await loadClusters(Number(kSelect.value), field);
+    umapStatus.textContent = `Projecting ${embeddings.length} images…`;
+    const model = new globalThis.UMAP({
+      nComponents: 2,
+      nNeighbors: Math.min(15, embeddings.length - 1),
+      minDist: 0.1,
+      distanceFn: cosineDistance,
+      random: seededRandom(42)
+    });
+    const projected = await model.fitAsync(embeddings.map(item => item.vector));
+    drawUmap(projected.map(([x, y], index) => ({
+      id: embeddings[index].retrievableId,
+      x, y,
+      clusterId: clusterById.get(embeddings[index].retrievableId) ?? '0'
+    })));
+    const note = data.truncated ? ' Showing the first 500 vectors.' : '';
+    umapStatus.textContent = `${embeddings.length} images · ${field} vectors · color indicates cluster.${note}`;
+  } catch (error) {
+    umapStatus.textContent = `Could not create the map: ${error.message}`;
+    mapPoints = [];
+    umapContext.clearRect(0, 0, umapCanvas.width, umapCanvas.height);
+  } finally {
+    showUmapButton.disabled = false;
+  }
+});
+
+umapCanvas.addEventListener('mousemove', event => {
+  if (!mapPoints.length) return;
+  const bounds = umapCanvas.getBoundingClientRect();
+  const x = (event.clientX - bounds.left) * (umapCanvas.width / bounds.width);
+  const y = (event.clientY - bounds.top) * (umapCanvas.height / bounds.height);
+  const nearest = mapPoints.reduce((best, point) => {
+    const distance = Math.hypot(point.pixelX - x, point.pixelY - y);
+    return distance < best.distance ? { point, distance } : best;
+  }, { point: null, distance: 18 });
+  umapCanvas.title = nearest.point
+    ? `Image ${nearest.point.id} · Cluster ${Number(nearest.point.clusterId) + 1}`
+    : 'UMAP image map';
+});
+
+umapCanvas.addEventListener('click', event => {
+  const bounds = umapCanvas.getBoundingClientRect();
+  const x = (event.clientX - bounds.left) * (umapCanvas.width / bounds.width);
+  const y = (event.clientY - bounds.top) * (umapCanvas.height / bounds.height);
+  const nearest = mapPoints.reduce((best, point) => {
+    const distance = Math.hypot(point.pixelX - x, point.pixelY - y);
+    return distance < best.distance ? { point, distance } : best;
+  }, { point: null, distance: 16 });
+  if (!nearest.point) return;
+  searchMode = 'browse';
+  latestItems = [{ id: nearest.point.id }];
+  render(latestItems);
+  statusLine.textContent = `Selected image from Cluster ${Number(nearest.point.clusterId) + 1}.`;
+});
+
 clusterSelect.addEventListener('change', () => render(latestItems));
 limitSelect.addEventListener('change', () => render(latestItems));
 kSelect.addEventListener('change', async () => {
   const wasBrowsing = searchMode === 'browse';
+  umapPanel.hidden = true;
   try {
-    const data = await loadClusters(Number(kSelect.value));
+    const data = await loadClusters(Number(kSelect.value), clusterFieldSelect.value);
     if (wasBrowsing) latestItems = (data.assignments || []).map(item => ({ id: item.retrievableId }));
     render(latestItems);
   } catch (error) {
@@ -284,7 +434,19 @@ kSelect.addEventListener('change', async () => {
   }
 });
 
-loadClusters(Number(kSelect.value))
+clusterFieldSelect.addEventListener('change', async () => {
+  const wasBrowsing = searchMode === 'browse';
+  umapPanel.hidden = true;
+  try {
+    const data = await loadClusters(Number(kSelect.value), clusterFieldSelect.value);
+    if (wasBrowsing) latestItems = (data.assignments || []).map(item => ({ id: item.retrievableId }));
+    render(latestItems);
+  } catch (error) {
+    statusLine.textContent = `Could not switch cluster vectors: ${error.message}`;
+  }
+});
+
+loadClusters(Number(kSelect.value), clusterFieldSelect.value)
   .then(() => { statusLine.textContent = 'Ready. Search with a description or a reference image.'; })
   .catch(error => { statusLine.textContent = `Could not connect to the API: ${error.message}`; });
 </script>

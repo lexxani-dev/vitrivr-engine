@@ -37,5 +37,6 @@ thumbnails/
 # OpenAPI generated code
 openapi
 thumbnails*
+example-configs/fes/node_modules/
 
 vitrivr-json/

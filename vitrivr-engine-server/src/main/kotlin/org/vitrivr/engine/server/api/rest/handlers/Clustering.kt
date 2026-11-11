@@ -11,12 +11,12 @@ import io.javalin.openapi.OpenApiResponse
 import kotlinx.serialization.Serializable
 import org.vitrivr.engine.core.model.metamodel.Schema
 import org.vitrivr.engine.core.model.descriptor.vector.FloatVectorDescriptor
-import org.vitrivr.engine.module.features.feature.external.implementations.clip.CLIPKMeansClusterer
+import org.vitrivr.engine.module.features.feature.external.implementations.clustering.SphericalKMeansClusterer
 import org.vitrivr.engine.server.api.rest.model.ErrorStatus
 import org.vitrivr.engine.server.api.rest.model.ErrorStatusException
 
 @Serializable
-data class ClusteringRequest(val k: Int? = null)
+data class ClusteringRequest(val k: Int? = null, val field: String? = null)
 
 @Serializable
 data class ClusterAssignmentResponse(
@@ -27,6 +27,7 @@ data class ClusterAssignmentResponse(
 
 @Serializable
 data class ClusteringResponse(
+    val field: String,
     val requestedK: Int,
     val clusterCount: Int,
     val imageCount: Int,
@@ -36,7 +37,7 @@ data class ClusteringResponse(
 @OpenApi(
     path = "/api/{schema}/clusters",
     methods = [HttpMethod.POST],
-    summary = "Clusters all CLIP image descriptors in a schema.",
+    summary = "Clusters dense vector descriptors in a schema field using cosine similarity.",
     operationId = "postClusterImages",
     tags = ["Retrieval"],
     pathParams = [
@@ -56,22 +57,24 @@ fun executeClustering(ctx: Context, schema: Schema) {
         throw ErrorStatusException(400, "Invalid clustering request: ${e.message}")
     }
 
-    val clipField = schema["clip"]
-        ?: throw ErrorStatusException(404, "Schema '${schema.name}' has no CLIP field.")
-    val descriptors = clipField.getReader().getAll().filterIsInstance<FloatVectorDescriptor>().toList()
+    val fieldName = request.field?.trim()?.takeIf { it.isNotEmpty() } ?: "clip"
+    val vectorField = schema[fieldName]
+        ?: throw ErrorStatusException(404, "Schema '${schema.name}' has no '$fieldName' field.")
+    val descriptors = vectorField.getReader().getAll().filterIsInstance<FloatVectorDescriptor>().toList()
     if (descriptors.isEmpty()) {
-        throw ErrorStatusException(400, "Schema '${schema.name}' contains no CLIP descriptors to cluster.")
+        throw ErrorStatusException(400, "Schema '${schema.name}' contains no vector descriptors in field '$fieldName'.")
     }
 
     val requestedK = request.k ?: 6
     val assignments = try {
-        CLIPKMeansClusterer.cluster(descriptors, requestedK)
+        SphericalKMeansClusterer.cluster(descriptors, requestedK)
     } catch (e: IllegalArgumentException) {
         throw ErrorStatusException(400, e.message ?: "Invalid clustering request.")
     }
 
     ctx.json(
         ClusteringResponse(
+            field = fieldName,
             requestedK = requestedK,
             clusterCount = assignments.map { it.clusterId }.distinct().size,
             imageCount = assignments.size,

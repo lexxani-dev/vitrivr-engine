@@ -1,0 +1,11 @@
+{
+  "name": "vitrivr-image-demo-assets",
+  "private": true,
+  "scripts": {
+    "build:umap": "esbuild umap-entry.js --bundle --minify --format=iife --outfile=umap.bundle.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.5",
+    "umap-js": "1.4.0"
+  }
+}

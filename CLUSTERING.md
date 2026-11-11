@@ -1,15 +1,16 @@
-# CLIP Image Search and Clustering Prototype
+# Image Search, Clustering, and UMAP Prototype
 
 ## Project status
 
-The 50-image demo milestone is implemented and ready for team review. The `codex/clip-clustering` branch, based on `team/image`, adds a CLIP clustering algorithm, a REST endpoint, headless server startup, and a fix for fetching stored JPEG thumbnails.
+The 50-image demo milestone is implemented and ready for team review. The `codex/clip-clustering` branch, based on `team/image`, adds cosine-based vector clustering, a REST endpoint, headless server startup, and a fix for fetching stored JPEG thumbnails. The portable demo now also includes a UMAP map for exploring the indexed feature space.
 
 This is a prototype result, not a production quality claim. The demo collection is small and its clusters are not sharply separated. The next meaningful project step is to review this branch with the teammate working on the API, then evaluate it on a larger, representative image collection.
 
 ## Implemented
 
-- **Clustering:** `CLIPKMeansClusterer` applies spherical k-means to normalized CLIP image descriptors and compares vectors with cosine similarity.
-- **REST API:** `POST /api/{schema}/clusters` clusters all CLIP descriptors in the schema. The request can set `k`; it defaults to 6.
+- **Clustering:** `SphericalKMeansClusterer` applies spherical k-means to dense vectors and compares vectors with cosine similarity.
+- **REST API:** `POST /api/{schema}/clusters` clusters descriptors from a selected vector field. The request can set `k` and `field`; `k` defaults to 6 and `field` defaults to `clip`.
+- **UMAP visualization:** `POST /api/{schema}/embeddings` returns a bounded sample of vectors. The portable demo projects up to 500 points to two dimensions in the browser and colors them by their cluster.
 - **Headless startup:** `--headless` starts the REST server without the interactive CLI.
 - **Thumbnail retrieval:** `GET /api/{schema}/fetch/{exporter}/{retrievableId}` fetches a stored JPEG. For the demo, the exporter is `thumbnail`; the handler resolves files with a `.jpg` suffix.
 
@@ -43,6 +44,7 @@ Example response:
 
 ```json
 {
+  "field": "clip",
   "requestedK": 6,
   "clusterCount": 6,
   "imageCount": 50,
@@ -58,7 +60,11 @@ Example response:
 
 `clusterCount` reports the number of non-empty clusters. Smaller `cosineDistance` values mean an image is closer to its assigned centroid. Use an assignment's `retrievableId` with the configured thumbnail exporter to display the image.
 
-The endpoint clusters every indexed CLIP descriptor in the schema. It does not cluster only the current text-search results.
+The endpoint clusters every indexed dense vector descriptor in the selected field. It does not cluster only the current search results. The current demo offers `clip` and `averagecolor`; each field describes a different similarity space.
+
+To cluster AverageColor descriptors, send `{"k":6,"field":"averagecolor"}`. Omitting `field` preserves the original CLIP behavior.
+
+The embeddings endpoint accepts an optional body such as `{"field":"clip","limit":500}`. `limit` is capped at 1,000 to keep visualization requests bounded. The demo uses UMAP with cosine distance and a fixed random seed; its 2D layout is an exploratory view, not a relevance score. If the collection is larger than 500 images, the map uses the first 500 returned vectors.
 
 ## Initial evaluation
 
@@ -87,16 +93,18 @@ The interactive learning page, its assignment CSV, color-coverage metadata, and 
 
 ## Implementation locations
 
-- Algorithm: `vitrivr-engine-module-features/src/main/kotlin/org/vitrivr/engine/module/features/feature/external/implementations/clip/CLIPKMeansClusterer.kt`
+- Algorithm: `vitrivr-engine-module-features/src/main/kotlin/org/vitrivr/engine/module/features/feature/external/implementations/clustering/SphericalKMeansClusterer.kt`
 - Clustering REST handler: `vitrivr-engine-server/src/main/kotlin/org/vitrivr/engine/server/api/rest/handlers/Clustering.kt`
+- Vector sample REST handler: `vitrivr-engine-server/src/main/kotlin/org/vitrivr/engine/server/api/rest/handlers/Embeddings.kt`
 - Thumbnail REST handler: `vitrivr-engine-server/src/main/kotlin/org/vitrivr/engine/server/api/rest/handlers/FetchExportData.kt`
 - Route registration: `vitrivr-engine-server/src/main/kotlin/org/vitrivr/engine/server/api/rest/Routes.kt`
 - Headless startup option: `vitrivr-engine-server/src/main/kotlin/org/vitrivr/engine/server/Main.kt`
 
 ## Limitations and next steps
 
-- The endpoint loads all descriptors and recomputes clusters on every request. For larger collections, cache or persist assignments and define when they become stale.
-- Clustering requires indexed CLIP descriptors. Empty schemas, invalid `k`, or a missing CLIP field return API errors.
+- The clustering endpoint loads all descriptors in the selected field and recomputes clusters on every request. For larger collections, cache or persist assignments and define when they become stale.
+- Clustering requires dense vector descriptors with equal dimensionality in the selected field. Empty schemas, invalid `k`, or a missing field return API errors.
+- The UMAP page needs at least three vectors. It limits the map to 500 points by default, so larger collections are only partially represented.
 - Cluster IDs are numeric and do not include generated names or semantic descriptions.
 - Source-folder agreement alone does not prove that the groups are useful to users; review representative results manually.
 - Before merging with the team's API work, compare route and startup changes with the teammate's branch to resolve overlap.

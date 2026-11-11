@@ -1,16 +1,16 @@
-package org.vitrivr.engine.module.features.feature.external.implementations.clip
+package org.vitrivr.engine.module.features.feature.external.implementations.clustering
 
 import org.vitrivr.engine.core.model.descriptor.vector.FloatVectorDescriptor
 import java.util.UUID
 import kotlin.math.sqrt
 
 /**
- * Groups CLIP image descriptors with spherical k-means using cosine similarity.
+ * Groups dense image descriptors with spherical k-means using cosine similarity.
  *
  * Each input descriptor must belong to exactly one retrievable, as expected for an image collection.
  * The returned cluster IDs are compact and start at zero.
  */
-object CLIPKMeansClusterer {
+object SphericalKMeansClusterer {
 
     data class Assignment(
         val retrievableId: UUID,
@@ -21,7 +21,7 @@ object CLIPKMeansClusterer {
     private data class Sample(val id: UUID, val vector: FloatArray)
 
     /**
-     * @param descriptors image descriptors loaded from the schema's CLIP field
+     * @param descriptors vector descriptors loaded from a schema field
      * @param k requested number of clusters; identical vectors may produce fewer populated clusters
      * @param maxIterations maximum number of assignment/update rounds
      */
@@ -30,22 +30,22 @@ object CLIPKMeansClusterer {
         k: Int,
         maxIterations: Int = 100
     ): List<Assignment> {
-        require(descriptors.isNotEmpty()) { "At least one CLIP descriptor is required." }
+        require(descriptors.isNotEmpty()) { "At least one vector descriptor is required." }
         require(k in 1..descriptors.size) { "k must be between 1 and the number of descriptors." }
         require(maxIterations > 0) { "maxIterations must be positive." }
 
         val samples = descriptors.map { descriptor ->
             val id = descriptor.retrievableId
-                ?: throw IllegalArgumentException("Every CLIP descriptor must have a retrievable ID.")
+                ?: throw IllegalArgumentException("Every vector descriptor must have a retrievable ID.")
             Sample(id, normalize(descriptor.vector.value))
         }.sortedBy { it.id.toString() }
 
         require(samples.map { it.id }.toSet().size == samples.size) {
-            "Expected one CLIP descriptor per retrievable."
+            "Expected one vector descriptor per retrievable."
         }
         val dimensions = samples.first().vector.size
         require(samples.all { it.vector.size == dimensions }) {
-            "All CLIP descriptors must have the same dimensionality."
+            "All vector descriptors must have the same dimensionality."
         }
 
         var centroids = initializeCentroids(samples.map { it.vector }, k)
@@ -143,10 +143,10 @@ object CLIPKMeansClusterer {
     }
 
     private fun normalize(vector: FloatArray): FloatArray {
-        require(vector.isNotEmpty()) { "CLIP vectors must not be empty." }
-        require(vector.all { it.isFinite() }) { "CLIP vectors must contain only finite values." }
+        require(vector.isNotEmpty()) { "Vectors must not be empty." }
+        require(vector.all { it.isFinite() }) { "Vectors must contain only finite values." }
         val norm = sqrt(vector.sumOf { value -> value.toDouble() * value })
-        require(norm > 0.0) { "CLIP vectors must not be zero vectors." }
+        require(norm > 0.0) { "Vectors must not be zero vectors." }
         return FloatArray(vector.size) { index -> (vector[index].toDouble() / norm).toFloat() }
     }
 

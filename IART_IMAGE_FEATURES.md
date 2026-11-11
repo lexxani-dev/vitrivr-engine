@@ -13,8 +13,8 @@ TIBaVA work is outside this scope.
   `example-configs/fes/search-demo.html`; it offers CLIP image search and AverageColor image search.
 - **Color baseline:** the FES schema and ingestion pipeline already include `AverageColor`, a three-value RGB summary.
   This is useful for a simple comparison, but it is not equivalent to iART's color plug-ins.
-- **Clustering:** the project already has a CLIP spherical k-means endpoint. The local 50-image demo can browse and
-  filter cluster assignments. A two-dimensional UMAP canvas is not implemented in the tracked UI.
+- **Clustering:** the project has spherical k-means for dense vector fields, with CLIP as the default and AverageColor
+  available as a second space in the portable demo. The demo now has a two-dimensional UMAP map of up to 500 vectors.
 - **Classification/tagging:** a basic OpenCLIP classification field exists in the FES setup. The teammate owns the
   tagging work, so this assessment does not propose duplicating it.
 
@@ -33,7 +33,7 @@ shared space. See the [iART paper](https://arxiv.org/abs/2108.01542) and the [of
 | BYOL art features | Not enabled in the current team pipeline | Obtain the exact art-trained checkpoint and preprocessing; implement a separate image-only extractor and reindex |
 | Painter style/genre features | Not enabled in the current team pipeline | Obtain the model and labels/checkpoint; add a separate feature/classification path and reindex |
 | Iconclass/iMet/Painter classifiers | Not equivalent to the current OpenCLIP top-label setup; tagging belongs to the teammate | Coordinate with the teammate and compare the original label sets and model outputs |
-| Clustering and UMAP | CLIP k-means exists; UMAP/canvas view is missing | Add a 2D projection and interactive view after the embedding choices are settled |
+| Clustering and UMAP | Spherical k-means works on selected dense-vector fields; the portable demo projects up to 500 vectors with UMAP | Evaluate the map on a larger art collection and compare feature spaces |
 
 ## Integration constraints
 
@@ -69,5 +69,5 @@ behind the existing vitrivr field/query interfaces, while keeping CLIP intact.
 2. Keep AverageColor as a comparison baseline; do not call it the original iART color model.
 3. For M I2/M I3, request or locate the exact iART checkpoints, preprocessing details, label definitions, and licenses.
    Then select one image-only model for a separate-field proof of concept.
-4. Add UMAP and richer cluster exploration in M I4 after the desired embedding space is chosen.
+4. Evaluate the new UMAP map and field-selectable clustering in M I4 on a larger art collection.
 5. Leave custom models and retrieval experiments for M I5.
