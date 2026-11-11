@@ -50,10 +50,15 @@ behind the existing vitrivr field/query interfaces, while keeping CLIP intact.
 ## UI comparison
 
 - The current small demo is the quickest M1 path and now includes reference-image search.
-- The official [vitrivr-web README](https://github.com/vitrivr/vitrivr-web/blob/main/README.md) describes a React UI with
-  text and image query components and configurable engine URLs. It also says image-to-image search needs adaptation
-  and that DRES integration should be removed for a non-competition setup. It is a reasonable later candidate, not a
-  drop-in replacement today.
+- The official [vitrivr-web README](https://github.com/vitrivr/vitrivr-web/blob/main/README.md) describes a React UI
+  with a configurable engine URL and schema selector. The query and schema-list routes match vitrivr-engine.
+- The current [vitrivr-web query UI](https://github.com/vitrivr/vitrivr-web/blob/main/vitrivr-web/src/components/QueryBuilderComponents/QueryBlock.tsx)
+  has its image-query choice commented out. A dormant image branch exists in `SearchCard`, but it currently builds a
+  `TEXT` input, so it must be changed to submit an `IMAGE` data URL for this project's CLIP endpoint. The result
+  thumbnails also expect a separate static media server; this project can instead use the engine's
+  `/api/{schema}/fetch/thumbnail/{retrievableId}` endpoint. DRES should be removed for a standalone project UI.
+  Thus, vitrivr-web is a promising later UI base, but its image workflow and thumbnail loading need adaptation before
+  it can replace the current page.
 - The older [vitrivr-ng UI](https://github.com/vitrivr/vitrivr-ng) is built for Cineast, so it is not the right direct
   integration target for this engine.
 
