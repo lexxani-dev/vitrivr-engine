@@ -1,5 +1,9 @@
 FROM faberf/featureextractionserver:open_clip_vit_b32-latest
 
+USER root
+RUN python -m pip uninstall -y opencv-python \
+    && python -m pip install --no-cache-dir --no-deps opencv-python-headless==4.9.0.80
+
 COPY fes-byol/ /tmp/fes-byol/
 RUN python -m pip install --no-deps --no-build-isolation /tmp/fes-byol \
     && rm -rf /tmp/fes-byol

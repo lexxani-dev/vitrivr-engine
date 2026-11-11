@@ -21,7 +21,9 @@ services:
     ports:
       - "8889:8888"
     volumes:
-      - ./sandbox/model-cache:/root/.cache/huggingface
+      - type: bind
+        source: ${FES_MODEL_CACHE:-./sandbox/model-cache}
+        target: /root/.cache/huggingface
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8888/api/tasks')"]
       interval: 10s
@@ -56,7 +58,7 @@ services:
       fes-byol:
         condition: service_healthy
     ports:
-      - "7071:7070"
+      - "${ENGINE_PORT:-7071}:7070"
     tty: true
     stdin_open: true
     volumes:

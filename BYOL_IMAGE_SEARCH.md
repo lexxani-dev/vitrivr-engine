@@ -30,15 +30,17 @@ tar -xzf "$env:USERPROFILE\Downloads\models_cpu.tar.gz" -C .\sandbox models/byol
 From the repository root, start the FES-backed demo stack using `docker-compose.fes.yml`:
 
 ```powershell
-docker compose -f docker-compose.fes.yml up --build
+$env:ENGINE_PORT = "7074" # Use 7071 instead if it is free.
+$env:FES_MODEL_CACHE = "C:/path/to/sandbox/model-cache" # Optional: reuse a downloaded OpenCLIP cache.
+docker compose -p vitrivr-byol -f docker-compose.fes.yml up --build -d
 ```
 
-It uses the local ports
-7071 (Engine), 8889 (CLIP FES), 8890 (BYOL FES), and 5434 (database), leaving the existing 7070 stack untouched.
-The BYOL FES service requires the model file above. Once the stack is ready, initialize the `sandbox` schema, ingest
-the image collection again so the new `byol` descriptors are stored, and open `example-configs/fes/search-demo.html`.
-Choose **iART BYOL (image only)** to search by an uploaded image, or choose **iART BYOL** under Cluster vectors to
-cluster/project that feature space.
+This starts an isolated stack on Engine port 7074 (or the selected `ENGINE_PORT`), CLIP FES port 8889, BYOL FES port
+8890, and database port 5434, leaving the existing 7070 stack untouched. The BYOL FES service requires the model file
+above. Once the stack is ready, initialize the `sandbox` schema, ingest the image collection again so the new `byol`
+descriptors are stored, and open `example-configs/fes/search-demo.html` with the API set to
+`http://127.0.0.1:7074/api/sandbox`. Choose **iART BYOL (image only)** to search by an uploaded image, or choose
+**iART BYOL** under Cluster vectors to cluster/project that feature space.
 
 CLIP remains the text-search feature. AverageColor remains available as a simple baseline. A fresh ingestion is
 required because existing database entries do not contain BYOL descriptors.
