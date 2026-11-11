@@ -28,8 +28,15 @@
     #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
     #umap-panel { margin: 18px 0; padding: 18px; border: 1px solid #374151; border-radius: 12px; background: #172235; }
     #umap-panel[hidden] { display: none; }
+    #umap-stage { position: relative; }
     #umap-canvas { display: block; width: 100%; height: min(62vw, 620px); min-height: 340px; border: 1px solid #374151; border-radius: 8px; background: #111827; cursor: crosshair; }
     #umap-status { min-height: 24px; color: #93c5fd; }
+    #umap-popup { position: absolute; z-index: 2; box-sizing: border-box; width: 260px; max-width: calc(100% - 16px); padding: 10px; border: 1px solid #64748b; border-radius: 10px; background: #1f2937; box-shadow: 0 12px 30px #0009; }
+    #umap-popup[hidden] { display: none; }
+    #umap-popup img { display: block; width: 100%; height: 160px; margin-top: 8px; border-radius: 6px; background: #0b1220; object-fit: contain; }
+    #umap-popup-title { min-width: 0; overflow: hidden; color: #f3f4f6; font-size: .9rem; text-overflow: ellipsis; white-space: nowrap; }
+    #umap-popup-close { padding: 4px 8px; background: transparent; color: #cbd5e1; }
+    #umap-popup-error { margin: 8px 0 0; color: #fca5a5; font-size: .85rem; }
     article { overflow: hidden; border: 1px solid #374151; border-radius: 12px; background: #1f2937; }
     article img { width: 100%; height: 190px; object-fit: cover; background: #0b1220; }
     article div { padding: 10px 12px; }
@@ -92,8 +99,18 @@
     <h2>Image map</h2>
     <p>Nearby points have similar vectors in the selected feature space. UMAP coordinates are for exploration, not a relevance score.</p>
     <div id="umap-status" aria-live="polite"></div>
-    <canvas id="umap-canvas" width="1000" height="620" aria-label="Two-dimensional UMAP projection of indexed images"></canvas>
-    <p class="note">Point color shows its cluster. Hover to see an image ID; click a point to open that image below.</p>
+    <div id="umap-stage">
+      <canvas id="umap-canvas" width="1000" height="620" aria-label="Two-dimensional UMAP projection of indexed images"></canvas>
+      <div id="umap-popup" role="status" aria-live="polite" hidden>
+        <div class="meta">
+          <span id="umap-popup-title"></span>
+          <button id="umap-popup-close" type="button" aria-label="Close image preview">×</button>
+        </div>
+        <img id="umap-popup-image" alt="Selected image preview">
+        <p id="umap-popup-error" hidden>Image preview could not be loaded.</p>
+      </div>
+    </div>
+    <p class="note">Point color shows its cluster. Click a point to preview its image on the map.</p>
   </section>
   <section id="results" aria-label="Search results"></section>
 </main>
@@ -124,6 +141,12 @@ const umapPanel = document.querySelector('#umap-panel');
 const umapStatus = document.querySelector('#umap-status');
 const umapCanvas = document.querySelector('#umap-canvas');
 const umapContext = umapCanvas.getContext('2d');
+const umapStage = document.querySelector('#umap-stage');
+const umapPopup = document.querySelector('#umap-popup');
+const umapPopupTitle = document.querySelector('#umap-popup-title');
+const umapPopupImage = document.querySelector('#umap-popup-image');
+const umapPopupError = document.querySelector('#umap-popup-error');
+const umapPopupClose = document.querySelector('#umap-popup-close');
 
 let loadedK = null;
 let loadedField = null;
@@ -133,6 +156,7 @@ let previewUrl = null;
 let clusterCount = 0;
 let lastImageFeature = 'clip';
 let mapPoints = [];
+let selectedMapPointId = null;
 
 async function readApiResponse(response) {
   let data = {};
@@ -348,12 +372,57 @@ function drawUmap(points) {
     umapContext.strokeStyle = '#111827';
     umapContext.lineWidth = 2;
     umapContext.stroke();
+    if (point.id === selectedMapPointId) {
+      umapContext.beginPath();
+      umapContext.arc(point.pixelX, point.pixelY, 12, 0, Math.PI * 2);
+      umapContext.strokeStyle = '#f8fafc';
+      umapContext.lineWidth = 3;
+      umapContext.stroke();
+    }
   }
 }
+
+function closeMapPopup() {
+  umapPopup.hidden = true;
+  selectedMapPointId = null;
+  drawUmap(mapPoints);
+}
+
+function showMapPopup(point) {
+  selectedMapPointId = point.id;
+  drawUmap(mapPoints);
+  umapPopup.hidden = false;
+  umapPopupTitle.textContent = `Cluster ${Number(point.clusterId) + 1} · ${point.id.slice(0, 8)}`;
+  umapPopupImage.hidden = false;
+  umapPopupError.hidden = true;
+  umapPopupImage.alt = `Preview of image ${point.id}`;
+  umapPopupImage.src = `${api}/fetch/thumbnail/${encodeURIComponent(point.id)}`;
+
+  const canvasRect = umapCanvas.getBoundingClientRect();
+  const stageRect = umapStage.getBoundingClientRect();
+  const pointX = canvasRect.left - stageRect.left + point.pixelX * (canvasRect.width / umapCanvas.width);
+  const pointY = canvasRect.top - stageRect.top + point.pixelY * (canvasRect.height / umapCanvas.height);
+  const popupWidth = Math.min(260, stageRect.width - 16);
+  const popupHeight = 230;
+  let left = pointX + 14;
+  let top = pointY + 14;
+  if (left + popupWidth > stageRect.width - 8) left = pointX - popupWidth - 14;
+  if (top + popupHeight > stageRect.height - 8) top = pointY - popupHeight - 14;
+  umapPopup.style.left = `${Math.max(8, Math.min(left, stageRect.width - popupWidth - 8))}px`;
+  umapPopup.style.top = `${Math.max(8, Math.min(top, stageRect.height - popupHeight - 8))}px`;
+}
+
+umapPopupImage.addEventListener('error', () => {
+  umapPopupImage.hidden = true;
+  umapPopupError.hidden = false;
+});
+umapPopupClose.addEventListener('click', closeMapPopup);
 
 showUmapButton.addEventListener('click', async () => {
   showUmapButton.disabled = true;
   umapPanel.hidden = false;
+  umapPopup.hidden = true;
+  selectedMapPointId = null;
   mapPoints = [];
   umapStatus.textContent = 'Loading image vectors…';
   try {
@@ -413,11 +482,15 @@ umapCanvas.addEventListener('click', event => {
     const distance = Math.hypot(point.pixelX - x, point.pixelY - y);
     return distance < best.distance ? { point, distance } : best;
   }, { point: null, distance: 16 });
-  if (!nearest.point) return;
+  if (!nearest.point) {
+    closeMapPopup();
+    return;
+  }
+  showMapPopup(nearest.point);
   searchMode = 'browse';
   latestItems = [{ id: nearest.point.id }];
   render(latestItems);
-  statusLine.textContent = `Selected image from Cluster ${Number(nearest.point.clusterId) + 1}.`;
+  statusLine.textContent = `Selected image from Cluster ${Number(nearest.point.clusterId) + 1}. Preview is open on the map.`;
 });
 
 clusterSelect.addEventListener('change', () => render(latestItems));

@@ -10,7 +10,7 @@ This is a prototype result, not a production quality claim. The demo collection 
 
 - **Clustering:** `SphericalKMeansClusterer` applies spherical k-means to dense vectors and compares vectors with cosine similarity.
 - **REST API:** `POST /api/{schema}/clusters` clusters descriptors from a selected vector field. The request can set `k` and `field`; `k` defaults to 6 and `field` defaults to `clip`.
-- **UMAP visualization:** `POST /api/{schema}/embeddings` returns a bounded sample of vectors. The portable demo projects up to 500 points to two dimensions in the browser and colors them by their cluster.
+- **UMAP visualization:** `POST /api/{schema}/embeddings` returns a bounded sample of vectors. The portable demo projects up to 500 points to two dimensions in the browser, colors them by cluster, and opens an image preview when a point is selected.
 - **Headless startup:** `--headless` starts the REST server without the interactive CLI.
 - **Thumbnail retrieval:** `GET /api/{schema}/fetch/{exporter}/{retrievableId}` fetches a stored JPEG. For the demo, the exporter is `thumbnail`; the handler resolves files with a `.jpg` suffix.
 
