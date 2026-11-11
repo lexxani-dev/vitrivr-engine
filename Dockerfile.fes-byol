@@ -1,0 +1,7 @@
+FROM faberf/featureextractionserver:open_clip_vit_b32-latest
+
+COPY fes-byol/ /tmp/fes-byol/
+RUN python -m pip install --no-deps --no-build-isolation /tmp/fes-byol \
+    && rm -rf /tmp/fes-byol
+
+ENV BYOL_MODEL_PATH=/models/byol_embedding/byol_wikipedia.pt

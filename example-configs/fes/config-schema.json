@@ -30,6 +30,15 @@
             "distance": "COSINE"
           }
         },
+        "byol": {
+          "factory": "DenseEmbedding",
+          "parameters": {
+            "host": "http://fes-byol:8888",
+            "model": "byol-wikipedia",
+            "length": "256",
+            "distance": "COSINE"
+          }
+        },
         "classification": {
           "factory": "ImageClassification",
           "parameters": {

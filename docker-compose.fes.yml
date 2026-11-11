@@ -29,6 +29,22 @@ services:
       retries: 30
       start_period: 60s
 
+  fes-byol:
+    build:
+      context: .
+      dockerfile: Dockerfile.fes-byol
+    image: vitrivr/fes-byol-wikipedia:local
+    ports:
+      - "8890:8888"
+    volumes:
+      - ./sandbox/models/byol_embedding:/models/byol_embedding:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8888/api/models')"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
   vitrivr-engine-fes:
     build: .
     image: vitrivr-engine:fes-local
@@ -36,6 +52,8 @@ services:
       db:
         condition: service_healthy
       fes:
+        condition: service_healthy
+      fes-byol:
         condition: service_healthy
     ports:
       - "7071:7070"

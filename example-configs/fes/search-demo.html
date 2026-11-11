@@ -61,6 +61,7 @@
       <label>Image feature
         <select id="image-feature" aria-label="Image search feature">
           <option value="clip">CLIP</option>
+          <option value="byol">iART BYOL (image only)</option>
           <option value="averagecolor">Average color (baseline)</option>
         </select>
       </label>
@@ -79,6 +80,7 @@
     <label>Cluster vectors
       <select id="cluster-field" aria-label="Vector field used for clustering">
         <option value="clip">CLIP</option>
+        <option value="byol">iART BYOL</option>
         <option value="averagecolor">Average color</option>
       </select>
     </label>
@@ -220,7 +222,9 @@ function render(items) {
     return;
   }
   const description = searchMode === 'image'
-    ? lastImageFeature === 'averagecolor' ? 'images with similar average color' : 'visually similar images'
+    ? lastImageFeature === 'averagecolor' ? 'images with similar average color'
+      : lastImageFeature === 'byol' ? 'iART BYOL visually similar images'
+      : 'visually similar images'
     : searchMode === 'browse' ? 'images in the collection' : 'matching images';
   statusLine.textContent = `Showing ${visible.length} of ${filtered.length} ${description} · ${clusterCount} clusters (k=${loadedK}).`;
 }

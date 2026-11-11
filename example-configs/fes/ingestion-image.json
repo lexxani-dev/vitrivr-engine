@@ -30,6 +30,9 @@
     "clip": {
       "field": "clip"
     },
+    "byol": {
+      "field": "byol"
+    },
     "averagecolor": {
       "field": "averagecolor"
     },
@@ -97,10 +100,14 @@
       "inputs": [
         "source"
       ]
+    },
+    "byol": {
+      "operator": "byol",
+      "inputs": [
+        "source"
+      ]
     }
   },
-  "output": [
-    "labels"
-  ],
+  "output": ["labels", "byol"],
   "mergeType": "MERGE"
 }
