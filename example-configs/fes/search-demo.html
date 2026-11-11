@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vitrivr Image Retrieval Demo</title>
+  <style>
+    :root { color-scheme: dark; font-family: Segoe UI, Arial, sans-serif; }
+    body { margin: 0; background: #111827; color: #f3f4f6; }
+    main { max-width: 1200px; margin: auto; padding: 28px; }
+    h1 { margin: 0 0 8px; font-size: 1.7rem; }
+    h2 { margin: 0 0 8px; font-size: 1.15rem; }
+    p { color: #9ca3af; }
+    .panel, .filters { margin: 18px 0; padding: 18px; border: 1px solid #374151; border-radius: 12px; background: #172235; }
+    form, .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .panel form + form { margin-top: 18px; padding-top: 18px; border-top: 1px solid #374151; }
+    input, select, button { border: 1px solid #374151; border-radius: 9px; padding: 11px 13px; font: inherit; }
+    input { flex: 1; min-width: 220px; background: #1f2937; color: white; }
+    input[type="file"] { min-width: 260px; }
+    select { background: #1f2937; color: white; }
+    button { background: #2563eb; color: white; border: 0; cursor: pointer; }
+    button.secondary { background: #263449; border: 1px solid #374151; }
+    button:disabled { opacity: .6; cursor: wait; }
+    #image-preview { display: block; max-width: 260px; max-height: 180px; margin-top: 12px; border: 1px solid #374151; border-radius: 8px; object-fit: contain; }
+    #image-preview[hidden] { display: none; }
+    #status { min-height: 24px; color: #93c5fd; }
+    #api-label, .note { font-size: .88rem; }
+    #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+    article { overflow: hidden; border: 1px solid #374151; border-radius: 12px; background: #1f2937; }
+    article img { width: 100%; height: 190px; object-fit: cover; background: #0b1220; }
+    article div { padding: 10px 12px; }
+    .meta { display: flex; justify-content: space-between; gap: 8px; color: #cbd5e1; font-size: .9rem; }
+    .id { margin-top: 6px; color: #9ca3af; font-size: .78rem; overflow-wrap: anywhere; }
+    @media (max-width: 600px) { main { padding: 18px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>vitrivr Image Retrieval Demo</h1>
+  <p>Search indexed images by a text description or upload a reference image to find visually similar results.</p>
+  <p id="api-label"></p>
+
+  <section class="panel" aria-label="Search options">
+    <form id="text-form">
+      <input id="query" placeholder="Describe an image, for example: a fox in a forest" aria-label="Text search query">
+      <button id="text-button" type="submit">Search by text</button>
+    </form>
+    <form id="image-form">
+      <input id="image-file" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose a reference image" required>
+      <label>Image feature
+        <select id="image-feature" aria-label="Image search feature">
+          <option value="clip">CLIP</option>
+          <option value="averagecolor">Average color (baseline)</option>
+        </select>
+      </label>
+      <button id="image-button" type="submit">Search by image</button>
+    </form>
+    <img id="image-preview" alt="Preview of the reference image" hidden>
+    <p class="note">Supported: JPEG, PNG, and WebP up to 20 MB. The selected image is a query only; it is not ingested or stored. Scores rank results; they are not percentages.</p>
+  </section>
+
+  <section class="filters" aria-label="Result controls">
+    <label>Clusters
+      <select id="k" aria-label="Number of clusters">
+        <option value="4">4</option><option value="6" selected>6</option><option value="8">8</option><option value="10">10</option>
+      </select>
+    </label>
+    <label>Results
+      <select id="limit" aria-label="Number of results">
+        <option value="10">10</option><option value="20" selected>20</option><option value="50">50</option>
+      </select>
+    </label>
+    <label>Cluster
+      <select id="cluster" aria-label="Filter by cluster"><option value="all">All clusters</option></select>
+    </label>
+    <button id="browse" class="secondary" type="button">Browse collection</button>
+  </section>
+
+  <div id="status" aria-live="polite">Loading cluster information…</div>
+  <section id="results" aria-label="Search results"></section>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const defaultApi = 'http://127.0.0.1:7071/api/sandbox';
+const api = (params.get('api') || defaultApi).replace(/\/+$/, '');
+document.querySelector('#api-label').textContent = `API: ${api}`;
+
+const clusterById = new Map();
+const clusterSelect = document.querySelector('#cluster');
+const kSelect = document.querySelector('#k');
+const limitSelect = document.querySelector('#limit');
+const statusLine = document.querySelector('#status');
+const results = document.querySelector('#results');
+const textForm = document.querySelector('#text-form');
+const imageForm = document.querySelector('#image-form');
+const imageFile = document.querySelector('#image-file');
+const imagePreview = document.querySelector('#image-preview');
+const imageFeature = document.querySelector('#image-feature');
+const imageButton = document.querySelector('#image-button');
+const textButton = document.querySelector('#text-button');
+const browseButton = document.querySelector('#browse');
+
+let loadedK = null;
+let latestItems = [];
+let searchMode = 'ready';
+let previewUrl = null;
+let clusterCount = 0;
+let lastImageFeature = 'clip';
+
+async function readApiResponse(response) {
+  let data = {};
+  try { data = await response.json(); } catch {}
+  if (!response.ok) throw new Error(data.message || `Request failed (${response.status})`);
+  return data;
+}
+
+async function loadClusters(k) {
+  const response = await fetch(`${api}/clusters`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ k })
+  });
+  const data = await readApiResponse(response);
+  clusterById.clear();
+  for (const assignment of data.assignments || []) {
+    clusterById.set(assignment.retrievableId, String(assignment.clusterId));
+  }
+  clusterSelect.replaceChildren(new Option('All clusters', 'all'));
+  const ids = [...new Set(clusterById.values())].sort((a, b) => Number(a) - Number(b));
+  for (const id of ids) clusterSelect.add(new Option(`Cluster ${Number(id) + 1}`, id));
+  clusterCount = data.clusterCount || 0;
+  loadedK = k;
+  return data;
+}
+
+function render(items) {
+  const selected = clusterSelect.value;
+  const filtered = items.filter(item => selected === 'all' || clusterById.get(item.id) === selected);
+  const visible = filtered.slice(0, Number(limitSelect.value));
+  results.replaceChildren();
+
+  for (const item of visible) {
+    const card = document.createElement('article');
+    const image = document.createElement('img');
+    image.loading = 'lazy';
+    image.alt = `Retrieved image ${item.id}`;
+    image.src = `${api}/fetch/thumbnail/${encodeURIComponent(item.id)}`;
+    const body = document.createElement('div');
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    if (searchMode !== 'browse' && Number.isFinite(Number(item.score))) {
+      const score = document.createElement('span');
+      score.textContent = `Score ${Number(item.score).toFixed(3)}`;
+      meta.append(score);
+    }
+    const cluster = document.createElement('span');
+    const clusterId = clusterById.get(item.id);
+    cluster.textContent = clusterId === undefined ? '' : `Cluster ${Number(clusterId) + 1}`;
+    meta.append(cluster);
+    const id = document.createElement('div');
+    id.className = 'id';
+    id.textContent = item.id;
+    body.append(meta, id);
+    card.append(image, body);
+    results.append(card);
+  }
+
+  if (filtered.length === 0) {
+    statusLine.textContent = 'No results match the current cluster filter.';
+    return;
+  }
+  const description = searchMode === 'image'
+    ? lastImageFeature === 'averagecolor' ? 'images with similar average color' : 'visually similar images'
+    : searchMode === 'browse' ? 'images in the collection' : 'matching images';
+  statusLine.textContent = `Showing ${visible.length} of ${filtered.length} ${description} · ${clusterCount} clusters (k=${loadedK}).`;
+}
+
+async function submitQuery(body, mode) {
+  const button = mode === 'image' ? imageButton : textButton;
+  button.disabled = true;
+  searchMode = mode;
+  statusLine.textContent = mode === 'image' ? 'Searching by image…' : 'Searching by text…';
+  try {
+    const k = Number(kSelect.value);
+    if (loadedK !== k) await loadClusters(k);
+    const response = await fetch(`${api}/query`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const data = await readApiResponse(response);
+    latestItems = data.retrievables || [];
+    render(latestItems);
+  } catch (error) {
+    statusLine.textContent = `Search failed: ${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+textForm.addEventListener('submit', event => {
+  event.preventDefault();
+  const query = document.querySelector('#query').value.trim();
+  if (!query) {
+    statusLine.textContent = 'Enter a text description first.';
+    return;
+  }
+  submitQuery({
+    inputs: { text: { type: 'TEXT', data: query } },
+    operations: { clip: { field: 'clip', inputs: { txt: 'text' }, parameters: { limit: '1000' } } },
+    output: 'clip'
+  }, 'text');
+});
+
+imageFile.addEventListener('change', () => {
+  const file = imageFile.files?.[0];
+  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  if (!file) {
+    imagePreview.removeAttribute('src');
+    imagePreview.hidden = true;
+    return;
+  }
+  previewUrl = URL.createObjectURL(file);
+  imagePreview.src = previewUrl;
+  imagePreview.hidden = false;
+});
+
+imageForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const file = imageFile.files?.[0];
+  if (!file) {
+    statusLine.textContent = 'Choose a reference image first.';
+    return;
+  }
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    statusLine.textContent = 'Choose a JPEG, PNG, or WebP image.';
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    statusLine.textContent = 'The selected image is larger than 20 MB.';
+    return;
+  }
+
+  try {
+    const feature = imageFeature.value;
+    lastImageFeature = feature;
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Could not read the selected image.'));
+      reader.readAsDataURL(file);
+    });
+    await submitQuery({
+      inputs: { image: { type: 'IMAGE', data: dataUrl } },
+      operations: { [feature]: { field: feature, inputs: { image: 'image' }, parameters: { limit: '1000' } } },
+      output: feature
+    }, 'image');
+  } catch (error) {
+    statusLine.textContent = `Image search failed: ${error.message}`;
+  }
+});
+
+browseButton.addEventListener('click', async () => {
+  browseButton.disabled = true;
+  searchMode = 'browse';
+  statusLine.textContent = 'Loading the collection…';
+  try {
+    const data = await loadClusters(Number(kSelect.value));
+    latestItems = (data.assignments || []).map(item => ({ id: item.retrievableId }));
+    render(latestItems);
+  } catch (error) {
+    statusLine.textContent = `Could not load the collection: ${error.message}`;
+  } finally {
+    browseButton.disabled = false;
+  }
+});
+
+clusterSelect.addEventListener('change', () => render(latestItems));
+limitSelect.addEventListener('change', () => render(latestItems));
+kSelect.addEventListener('change', async () => {
+  const wasBrowsing = searchMode === 'browse';
+  try {
+    const data = await loadClusters(Number(kSelect.value));
+    if (wasBrowsing) latestItems = (data.assignments || []).map(item => ({ id: item.retrievableId }));
+    render(latestItems);
+  } catch (error) {
+    statusLine.textContent = `Could not update clusters: ${error.message}`;
+  }
+});
+
+loadClusters(Number(kSelect.value))
+  .then(() => { statusLine.textContent = 'Ready. Search with a description or a reference image.'; })
+  .catch(error => { statusLine.textContent = `Could not connect to the API: ${error.message}`; });
+</script>
+</body>
+</html>

@@ -146,6 +146,22 @@ The helper encodes the image as a Base64 data URL and submits it to the same `cl
 the number of returned results. Query responses contain retrievable IDs and scores; to preview a result, request
 `GET /api/sandbox/fetch/thumbnail/{retrievableId}` using its returned ID.
 
+#### Simple Search UI
+
+A demo page at [`example-configs/fes/search-demo.html`](example-configs/fes/search-demo.html) supports text
+search, reference-image search with either CLIP or the existing AverageColor feature, cluster filtering, and browsing
+the indexed collection. AverageColor is a basic color-similarity baseline; it is not a copy of iART's original color
+plugins. With the FES Compose stack running and images already indexed in the `sandbox` schema, serve the page from a
+second PowerShell window at the repository root:
+
+```powershell
+py -m http.server 7072 --directory example-configs/fes
+```
+
+Open `http://localhost:7072/search-demo.html`. The page uses `http://127.0.0.1:7071/api/sandbox` by default. To point
+it at a different API and schema, add an `api` query parameter, for example:
+`http://localhost:7072/search-demo.html?api=http://127.0.0.1:7070/api/clusteringdemo`.
+
 For either query type, the pipeline is the same after embedding: FES creates a 512-dimensional CLIP vector, the
 `clip` field compares it with indexed image vectors using cosine distance, and pgvector returns the nearest images
 first. The engine attaches a similarity `score` to each result. It is a ranking score, not a percentage or a
